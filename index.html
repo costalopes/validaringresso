@@ -86,13 +86,10 @@
                     <input type="text" id="ticketType" class="mt-1 block w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder="Ex: VIP, Pista, Camarote">
                 </div>
                  <div>
-                    <label for="buyerCPF" class="block text-sm font-medium text-gray-300">CPF do Comprador</label>
-                    <input type="text" id="buyerCPF" maxlength="11" class="mt-1 block w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder="Apenas números (11 dígitos)">
+                    <label for="buyerCPF" class="block text-sm font-medium text-gray-300">Identificador (CPF ou "PF")</label>
+                    <input type="text" id="buyerCPF" class="mt-1 block w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder="Ex: 12345678901 ou PF1">
                 </div>
-                 <div>
-                    <label for="buyerPassword" class="block text-sm font-medium text-gray-300">Senha (PIN)</label>
-                    <input type="password" id="buyerPassword" class="mt-1 block w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder="Ex: 1234 (para confirmação)">
-                </div>
+                 <!-- CAMPO DE SENHA (PIN) REMOVIDO -->
                 <button id="generateButton" class="w-full bg-orange-600 text-white font-bold py-2.5 px-4 rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition duration-150 ease-in-out">
                     Gerar QR Code
                 </button>
@@ -149,15 +146,15 @@
 
             <!-- Seção para Consultar CPF -->
             <div class="mb-6 pt-4 border-t border-gray-600">
-                <h3 class="text-xl font-semibold mb-2 text-orange-400">3. Consultar Status do CPF</h3>
-                <p class="text-sm text-gray-400 mb-3">Verifique o status de um CPF (se comprou / se já foi validado).</p>
+                <h3 class="text-xl font-semibold mb-2 text-orange-400">3. Consultar Status do Identificador</h3>
+                <p class="text-sm text-gray-400 mb-3">Verifique o status de um Identificador (se comprou / se já foi validado).</p>
                 <div class="space-y-3">
                     <div>
-                        <label for="checkCPF" class="block text-sm font-medium text-gray-300">CPF do Comprador</label>
-                        <input type="text" id="checkCPF" maxlength="11" class="mt-1 block w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder="Apenas números (11 dígitos)">
+                        <label for="checkCPF" class="block text-sm font-medium text-gray-300">Identificador (CPF ou "PF")</label>
+                        <input type="text" id="checkCPF" class="mt-1 block w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder="Ex: 12345678901 ou PF1">
                     </div>
                     <button id="checkCPFButton" class="w-full bg-blue-600 text-white font-bold py-2.5 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition duration-150 ease-in-out">
-                        Consultar CPF
+                        Consultar Identificador
                     </button>
                 </div>
             </div>
@@ -202,7 +199,7 @@
             buyerName: document.getElementById('buyerName'),
             ticketType: document.getElementById('ticketType'),
             buyerCPF: document.getElementById('buyerCPF'),
-            buyerPassword: document.getElementById('buyerPassword'),
+            // buyerPassword: document.getElementById('buyerPassword'), // Removido
             generateButton: document.getElementById('generateButton'),
             qrCodeOutput: document.getElementById('qrCodeOutput'),
             qrCanvas: document.getElementById('qr-canvas'),
@@ -306,7 +303,7 @@
             dom.importStatus.textContent = ''; 
             const isImported = localStorage.getItem(IMPORTED_FLAG_KEY) === 'true';
             
-            // Se NENHUMA lista foi IMPORTADA manualmente, sincroniza com a lista gerada localmente.
+            // Se NENHUMA lista foi IMPORTADA manually, sincroniza com a lista gerada localmente.
             if (!isImported) {
                 const generatedList = localStorage.getItem(GENERATED_TICKETS_KEY);
                 if (generatedList && generatedList !== '[]') {
@@ -338,28 +335,25 @@
             const name = dom.buyerName.value.trim();
             const type = dom.ticketType.value.trim();
             const cpf = dom.buyerCPF.value.trim();
-            const senha = dom.buyerPassword.value.trim();
+            // const senha = dom.buyerPassword.value.trim(); // Removido
             const secret = dom.secretKey.value; 
 
-            if (!name || !type || !cpf || !senha) {
-                showModal('erro', 'Erro', '', '', 'Preencha todos os campos: Nome, Tipo, CPF e Senha.');
+            if (!name || !type || !cpf) { // Removido !senha
+                showModal('erro', 'Erro', '', '', 'Preencha todos os campos: Nome, Tipo e Identificador.');
                 return;
             }
              if (!secret) {
                 showModal('erro', 'Erro', '', '', 'Chave secreta não configurada. Contate o admin.');
                 return;
             }
-            if (cpf.length !== 11) {
-                 showModal('erro', 'Erro', '', '', 'O CPF deve conter 11 dígitos.');
-                 return;
-            }
+            // Validação de 11 dígitos removida
 
             // 1. Criar o objeto de dados
             const data = {
                 name: name,
                 type: type,
                 cpf: cpf,
-                senha: senha, 
+                // senha: senha, // Removido
                 ts: Date.now() 
             };
             const dataString = JSON.stringify(data);
@@ -489,8 +483,9 @@
                 return;
             }
 
+            // Verificação de 'senha' removida
             if (!payload.data || !payload.sig || !payload.data.name || !payload.data.type || !payload.data.cpf) {
-                showModal('invalido', 'INVÁLIDO', '', '', 'Este QR Code não contém os dados esperados de um ingresso (Nome, Tipo, CPF).');
+                showModal('invalido', 'INVÁLIDO', '', '', 'Este QR Code não contém os dados esperados de um ingresso (Nome, Tipo, Identificador).');
                 return;
             }
 
@@ -590,8 +585,8 @@
         // --- Lógica para Consultar CPF (Atualizada) ---
         function checkCPFStatus() {
             const cpfToFind = dom.checkCPF.value.trim();
-            if (cpfToFind.length !== 11) {
-                showModal('erro', 'Erro', '', '', 'Por favor, insira um CPF válido de 11 dígitos para consultar.');
+            if (!cpfToFind) { // Verificação de 11 dígitos removida
+                showModal('erro', 'Erro', '', '', 'Por favor, insira um Identificador para consultar.');
                 return;
             }
 
@@ -611,7 +606,7 @@
                     'NÃO COMPROU',
                     '',
                     '',
-                    `Este CPF não foi encontrado na lista oficial de ingressos vendidos.`,
+                    `Este Identificador não foi encontrado na lista oficial de ingressos vendidos.`,
                     cpfToFind 
                 );
                 return;
@@ -628,7 +623,7 @@
                     'JÁ VALIDADO',
                     usedTicket.name,
                     usedTicket.type,
-                    `Este CPF comprou um ingresso e ele JÁ FOI VALIDADO neste dispositivo.`,
+                    `Este Identificador comprou um ingresso e ele JÁ FOI VALIDADO neste dispositivo.`,
                     usedTicket.cpf
                 );
             } else {
@@ -638,7 +633,7 @@
                     'COMPROU (NÃO VALIDADO)',
                     soldTicket.name,
                     soldTicket.type,
-                    `Este CPF comprou um ingresso e ainda NÃO FOI VALIDADO.`,
+                    `Este Identificador comprou um ingresso e ainda NÃO FOI VALIDADO.`,
                     soldTicket.cpf
                 );
             }
@@ -653,7 +648,7 @@
                 'Confirmar Ação', 
                 '', 
                 '', 
-                'Isso limpará APENAS a lista de ingressos JÁ USADOS. A lista mestra importada será mantida. Confirma?',
+                'Isso limpará a lista de ingressos USADOS, a lista MESTRA e reativará o auto-load. Confirma?', // Mensagem atualizada
                 null, // Passando null para o cpf
                 () => { // Passando a função de callback
                     localStorage.removeItem(USED_TICKETS_KEY);
@@ -696,10 +691,12 @@
             dom.modalType.textContent = type;
             
             if (cpf) {
-                const maskedCPF = cpf.length === 11 ? 
-                    `CPF: ***.***.${cpf.substring(6, 9)}-**` : 
-                    "CPF: (Formato inválido)";
-                dom.modalCPF.textContent = maskedCPF;
+                let displayCPF = `ID: ${cpf}`;
+                // Tenta mascarar apenas se for um CPF numérico de 11 dígitos
+                if (cpf.length === 11 && /^\d+$/.test(cpf)) {
+                    displayCPF = `CPF: ***.***.${cpf.substring(6, 9)}-**`;
+                }
+                dom.modalCPF.textContent = displayCPF;
                 dom.modalCPF.classList.remove('hidden');
             } else {
                 dom.modalCPF.textContent = '';
@@ -751,5 +748,3 @@
 
 </body>
 </html>
-
-
