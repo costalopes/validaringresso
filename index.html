@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validador de Ingressos (Halloween)</title>
+    <!-- 1. Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 2. Biblioteca para gerar QR Code -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+    <!-- 3. Biblioteca para ler QR Code -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <!-- 4. Fontes (Inter + Creepster para o tema) -->
+    <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Fontes personalizadas */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .font-creepster {
+            font-family: 'Creepster', cursive;
+        }
+        
+        /* Oculta o leitor de QR code por padrão */
+        #qr-reader {
+            width: 100%;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            border: 2px solid #4a5568; /* bg-gray-600 */
+        }
+        #qr-reader video {
+            width: 100% !important;
+            height: auto !important;
+        }
+        
+        /* Estilos para o modal de resultado */
+        dialog {
+            background-color: #2d3748; /* bg-gray-800 */
+            color: #e2e8f0; /* text-gray-200 */
+        }
+        dialog[open] {
+            animation: fadeIn 0.3s ease-out;
+        }
+        dialog::backdrop {
+            background-color: rgba(0, 0, 0, 0.7);
+            animation: fadeIn 0.3s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen">
+
+    <div class="container mx-auto max-w-lg p-5 bg-gray-800 shadow-lg shadow-orange-900/50 min-h-screen sm:min-h-0 sm:rounded-lg sm:my-8">
+        
+        <h1 class="text-5xl font-bold text-center text-orange-500 mb-6 font-creepster">
+            Validador de Ingressos
+        </h1>
+
+        <!-- Campo da Chave Secreta (ESSENCIAL) - Agora oculto e fixo -->
+        <input type="hidden" id="secretKey" value="UNICERRADO">
+        
+        <!-- Abas de Navegação -->
+        <div class="flex border-b border-gray-600 mb-5">
+            <button id="tab-generator-btn" class="flex-1 py-2 px-4 text-center font-medium text-orange-500 border-b-2 border-orange-500">
+                Gerar Ingresso
+            </button>
+            <button id="tab-validator-btn" class="flex-1 py-2 px-4 text-center font-medium text-gray-400 hover:text-orange-400">
+                Validar Ingresso
+            </button>
+        </div>
+
+        <!-- Painel: Gerador de Ingresso -->
+        <div id="generator-panel">
+            <h2 class="text-3xl font-semibold mb-4 text-orange-400 font-creepster">Gerar Novo Ingresso</h2>
+            <div class="space-y-4">
+                <div>
+                    <label for="buyerName" class="block text-sm font-medium text-gray-300">Nome do Comprador</label>
+                    <input type="text" id="buyerName" class="mt-1 block w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder="Ex: João da Silva">
+                </div>
+                <div>
+                    <label for="ticketType" class="block text-sm font-medium text-gray-300">Tipo do Ingresso</label>
+                    <input type="text" id="ticketType" class="mt-1 block w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder="Ex: VIP, Pista, Camarote">
+                </div>
+                 <div>
+                    <label for="buyerCPF" class="block text-sm font-medium text-gray-300">CPF do Comprador</label>
+                    <input type="text" id="buyerCPF" maxlength="11" class="mt-1 block w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder="Apenas números (11 dígitos)">
+                </div>
+                 <div>
+                    <label for="buyerPassword" class="block text-sm font-medium text-gray-300">Senha (PIN)</label>
+                    <input type="password" id="buyerPassword" class="mt-1 block w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder="Ex: 1234 (para confirmação)">
+                </div>
+                <button id="generateButton" class="w-full bg-orange-600 text-white font-bold py-2.5 px-4 rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition duration-150 ease-in-out">
+                    Gerar QR Code
+                </button>
+            </div>
+            
+            <!-- Saída do QR Code -->
+            <div id="qrCodeOutput" class="mt-6 flex flex-col items-center hidden">
+                <p class="font-medium text-gray-300 mb-2">Ingresso Gerado:</p>
+                <div id="qr-canvas" class="p-4 bg-white border border-gray-200 rounded-lg shadow-sm"></div>
+                <a id="downloadLink" class="mt-4 inline-block bg-green-700 text-white font-medium py-2 px-4 rounded-md hover:bg-green-800 transition duration-150 ease-in-out" href="#" download="ingresso.png">
+                    Baixar Imagem
+                </a>
+            </div>
+
+            <!-- NOVO: Seção para Exportar Lista -->
+            <div class="mt-8 pt-6 border-t border-gray-600">
+                <h3 class="text-2xl font-semibold mb-3 text-orange-400 font-creepster">Exportar Lista</h3>
+                <p class="text-sm text-gray-400 mb-3">Após gerar TODOS os ingressos, exporte a lista para os validadores.</p>
+                <button id="exportarListaButton" class="w-full bg-blue-600 text-white font-bold py-2.5 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition duration-150 ease-in-out">
+                    Exportar Lista de Ingressos (JSON)
+                </button>
+            </div>
+        </div>
+
+        <!-- Painel: Validador de Ingresso -->
+        <div id="validator-panel" class="hidden">
+            <h2 class="text-3xl font-semibold mb-4 text-orange-400 font-creepster">Validar Ingresso</h2>
+
+            <!-- NOVO: Seção para Importar Lista -->
+            <div class="mb-6 p-4 border border-orange-500 rounded-lg bg-gray-700">
+                <h3 class="text-xl font-semibold mb-2 text-orange-400">1. Carregar Lista de Ingressos</h3>
+                <p id="autoLoadStatus" class="text-sm text-green-400 mb-2"></p>
+                <p class="text-sm text-gray-400 mb-3">Para validar em *outros* dispositivos, importe o `ingressos_vendidos.json`.</p>
+                <input type="file" id="importFileInput" class="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:font-semibold file:bg-orange-600 file:text-white hover:file:bg-orange-700 cursor-pointer" accept=".json">
+                <p id="importStatus" class="text-sm text-green-400 mt-2"></p>
+            </div>
+
+            <!-- Seção de Validação por QR Code -->
+            <div class="mb-6 pt-4 border-t border-gray-600">
+                <h3 class="text-xl font-semibold mb-2 text-orange-400">2. Validar por QR Code</h3>
+                <div class="space-y-4">
+                    <button id="scanButton" class="w-full bg-green-600 text-white font-bold py-2.5 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition duration-150 ease-in-out">
+                        Abrir Câmera para Validar
+                    </button>
+                    <button id="stopScanButton" class="w-full bg-red-600 text-white font-bold py-2.5 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition duration-150 ease-in-out hidden">
+                        Fechar Câmera
+                    </button>
+                </div>
+                <div id="qr-reader" class="mt-4" style="display: none;"></div>
+                <p id="validator-instructions" class="text-sm text-gray-400 text-center mt-4">
+                    Posicione o QR Code do ingresso na área da câmera.
+                </p>
+            </div>
+
+            <!-- Seção para Consultar CPF -->
+            <div class="mb-6 pt-4 border-t border-gray-600">
+                <h3 class="text-xl font-semibold mb-2 text-orange-400">3. Consultar Status do CPF</h3>
+                <p class="text-sm text-gray-400 mb-3">Verifique o status de um CPF (se comprou / se já foi validado).</p>
+                <div class="space-y-3">
+                    <div>
+                        <label for="checkCPF" class="block text-sm font-medium text-gray-300">CPF do Comprador</label>
+                        <input type="text" id="checkCPF" maxlength="11" class="mt-1 block w-full px-3 py-2 border border-gray-600 bg-gray-700 text-gray-100 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500" placeholder="Apenas números (11 dígitos)">
+                    </div>
+                    <button id="checkCPFButton" class="w-full bg-blue-600 text-white font-bold py-2.5 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition duration-150 ease-in-out">
+                        Consultar CPF
+                    </button>
+                </div>
+            </div>
+
+            <button id="clearUsedTickets" class="w-full mt-6 pt-4 border-t border-gray-600 bg-yellow-600 text-black font-medium py-2 px-4 rounded-md hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-gray-800 transition duration-150 ease-in-out">
+                Limpar Lista de Ingressos Usados (CUIDADO)
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Modal de Resultado da Validação -->
+    <dialog id="resultModal" class="rounded-lg shadow-xl max-w-sm w-full p-0 bg-gray-800 text-gray-200">
+        <div id="modal-content" class="p-6 text-center">
+            <div id="modal-icon" class="w-16 h-16 rounded-full mx-auto flex items-center justify-center text-white mb-4">
+                <!-- Ícone (SVG) será inserido via JS -->
+            </div>
+            <h3 id="modal-status" class="text-2xl font-bold mb-2"></h3>
+            <p id="modal-name" class="text-lg text-gray-100"></p>
+            <p id="modal-type" class="text-md text-gray-300"></p>
+            <p id="modal-cpf" class="text-md font-mono text-orange-400 mb-4 hidden"></p>
+            <p id="modal-message" class="text-sm text-gray-400 mb-6"></p>
+            <button id="closeModalButton" class="w-full bg-gray-600 text-gray-100 font-medium py-2 px-4 rounded-md hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:ring-offset-gray-800 transition duration-150 ease-in-out">
+                Fechar
+            </button>
+        </div>
+    </dialog>
+
+
+    <script>
+        // --- Constantes e Variáveis Globais ---
+        const dom = {
+            secretKey: document.getElementById('secretKey'),
+            
+            // Abas
+            tabGeneratorBtn: document.getElementById('tab-generator-btn'),
+            tabValidatorBtn: document.getElementById('tab-validator-btn'),
+            generatorPanel: document.getElementById('generator-panel'),
+            validatorPanel: document.getElementById('validator-panel'),
+
+            // Gerador
+            buyerName: document.getElementById('buyerName'),
+            ticketType: document.getElementById('ticketType'),
+            buyerCPF: document.getElementById('buyerCPF'),
+            buyerPassword: document.getElementById('buyerPassword'),
+            generateButton: document.getElementById('generateButton'),
+            qrCodeOutput: document.getElementById('qrCodeOutput'),
+            qrCanvas: document.getElementById('qr-canvas'),
+            downloadLink: document.getElementById('downloadLink'),
+            exportarListaButton: document.getElementById('exportarListaButton'),
+
+            // Validador
+            scanButton: document.getElementById('scanButton'),
+            stopScanButton: document.getElementById('stopScanButton'),
+            qrReader: document.getElementById('qr-reader'),
+            clearUsedTickets: document.getElementById('clearUsedTickets'),
+            checkCPF: document.getElementById('checkCPF'),
+            checkCPFButton: document.getElementById('checkCPFButton'),
+            importFileInput: document.getElementById('importFileInput'),
+            importStatus: document.getElementById('importStatus'),
+            autoLoadStatus: document.getElementById('autoLoadStatus'),
+
+
+            // Modal
+            resultModal: document.getElementById('resultModal'),
+            modalContent: document.getElementById('modal-content'),
+            modalIcon: document.getElementById('modal-icon'),
+            modalStatus: document.getElementById('modal-status'),
+            modalName: document.getElementById('modal-name'),
+            modalType: document.getElementById('modal-type'),
+            modalCPF: document.getElementById('modal-cpf'),
+            modalMessage: document.getElementById('modal-message'),
+            closeModalButton: document.getElementById('closeModalButton'),
+        };
+
+        // Instância do leitor de QR code
+        let html5QrCode;
+        
+        // Chaves do LocalStorage
+        const GENERATED_TICKETS_KEY = 'validador_ingressos_gerados';
+        const SOLD_TICKETS_KEY = 'validador_ingressos_vendidos'; // Lista mestra importada
+        const USED_TICKETS_KEY = 'validador_ingressos_usados'; // Lista de ingressos já validados
+
+        // --- Funções Criptográficas (HMAC-SHA256) ---
+        // (Estas funções permanecem inalteradas)
+        function getCryptoKey(secret) {
+            return window.crypto.subtle.importKey(
+                "raw", new TextEncoder().encode(secret),
+                { name: "HMAC", hash: "SHA-256" },
+                false, ["sign", "verify"]
+            );
+        }
+        function buf2hex(buffer) {
+            return [...new Uint8Array(buffer)]
+                .map(x => x.toString(16).padStart(2, '0'))
+                .join('');
+        }
+        function hex2buf(hex) {
+            const bytes = new Uint8Array(hex.length / 2);
+            for (let i = 0; i < hex.length; i += 2) {
+                bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+            }
+            return bytes.buffer;
+        }
+        async function signData(dataString, secret) {
+            try {
+                const key = await getCryptoKey(secret);
+                const dataBuffer = new TextEncoder().encode(dataString);
+                const signatureBuffer = await window.crypto.subtle.sign("HMAC", key, dataBuffer);
+                return buf2hex(signatureBuffer);
+            } catch (e) { console.error("Erro ao assinar dados:", e); return null; }
+        }
+        async function verifyData(dataString, signatureHex, secret) {
+            try {
+                const key = await getCryptoKey(secret);
+                const signatureBuffer = hex2buf(signatureHex);
+                const dataBuffer = new TextEncoder().encode(dataString);
+                return await window.crypto.subtle.verify("HMAC", key, signatureBuffer, dataBuffer);
+            } catch (e) { console.error("Erro ao verificar dados:", e); return false; }
+        }
+
+        // --- Lógica de Navegação das Abas ---
+
+        function showGenerator() {
+            dom.generatorPanel.classList.remove('hidden');
+            dom.validatorPanel.classList.add('hidden');
+            dom.tabGeneratorBtn.classList.add('border-orange-500', 'text-orange-500');
+            dom.tabGeneratorBtn.classList.remove('text-gray-400', 'hover:text-orange-400');
+            dom.tabValidatorBtn.classList.remove('border-orange-500', 'text-orange-500');
+            dom.tabValidatorBtn.classList.add('text-gray-400', 'hover:text-orange-400');
+            stopScan(); // Para a câmera se estiver ligada
+        }
+
+        function showValidator() {
+            dom.generatorPanel.classList.add('hidden');
+            dom.validatorPanel.classList.remove('hidden');
+            dom.tabValidatorBtn.classList.add('border-orange-500', 'text-orange-500');
+            dom.tabValidatorBtn.classList.remove('text-gray-400', 'hover:text-orange-400');
+            dom.tabGeneratorBtn.classList.remove('border-orange-500', 'text-orange-500');
+            dom.tabGeneratorBtn.classList.add('text-gray-400', 'hover:text-orange-400');
+            stopScan(); // Para a câmera se estiver ligada
+
+            // --- NOVO: Lógica de Carregamento Automático ---
+            // Limpa o status de importação, mas não o de autoload
+            dom.importStatus.textContent = ''; 
+            const importedList = localStorage.getItem(SOLD_TICKETS_KEY);
+            
+            // Se NÃO houver lista importada, tenta carregar a lista gerada localmente.
+            if (!importedList || importedList === '[]') {
+                const generatedList = localStorage.getItem(GENERATED_TICKETS_KEY);
+                if (generatedList && generatedList !== '[]') {
+                    // Se encontrou uma lista gerada localmente, usa ela como a "lista mestra"
+                    localStorage.setItem(SOLD_TICKETS_KEY, generatedList);
+                    const tickets = JSON.parse(generatedList);
+                    const msg = `Carregados ${tickets.length} ingressos (gerados neste dispositivo).`;
+                    dom.autoLoadStatus.textContent = msg;
+                    console.log(msg); // Log para debug
+                } else {
+                    dom.autoLoadStatus.textContent = "Nenhuma lista local encontrada. Importe um arquivo.";
+                }
+            } else {
+                 const tickets = JSON.parse(importedList);
+                 dom.autoLoadStatus.textContent = `Carregados ${tickets.length} ingressos (da lista importada).`;
+            }
+            // --- Fim da Lógica de Carregamento Automático ---
+        }
+
+        dom.tabGeneratorBtn.onclick = showGenerator;
+        dom.tabValidatorBtn.onclick = showValidator;
+
+        // --- Lógica do Gerador de Ingresso ---
+
+        dom.generateButton.onclick = async () => {
+            const name = dom.buyerName.value.trim();
+            const type = dom.ticketType.value.trim();
+            const cpf = dom.buyerCPF.value.trim();
+            const senha = dom.buyerPassword.value.trim();
+            const secret = dom.secretKey.value; 
+
+            if (!name || !type || !cpf || !senha) {
+                showModal('erro', 'Erro', '', '', 'Preencha todos os campos: Nome, Tipo, CPF e Senha.');
+                return;
+            }
+             if (!secret) {
+                showModal('erro', 'Erro', '', '', 'Chave secreta não configurada. Contate o admin.');
+                return;
+            }
+            if (cpf.length !== 11) {
+                 showModal('erro', 'Erro', '', '', 'O CPF deve conter 11 dígitos.');
+                 return;
+            }
+
+            // 1. Criar o objeto de dados
+            const data = {
+                name: name,
+                type: type,
+                cpf: cpf,
+                senha: senha, 
+                ts: Date.now() 
+            };
+            const dataString = JSON.stringify(data);
+
+            // 2. Assinar os dados
+            const signature = await signData(dataString, secret);
+            if (!signature) {
+                showModal('erro', 'Erro', '', '', 'Não foi possível gerar a assinatura. Verifique a chave.');
+                return;
+            }
+
+            // 3. Criar o payload final para o QR Code
+            const payload = {
+                v: 1, 
+                data: data,
+                sig: signature
+            };
+            const payloadString = JSON.stringify(payload);
+            
+            // 4. Salvar na lista de gerados (para exportação)
+            let generatedTickets = JSON.parse(localStorage.getItem(GENERATED_TICKETS_KEY)) || [];
+            
+            // Evita duplicados (baseado na assinatura)
+            if (!generatedTickets.find(t => t.sig === signature)) {
+                 generatedTickets.push({
+                    sig: signature,
+                    name: name,
+                    type: type,
+                    cpf: cpf,
+                    ts: data.ts
+                });
+                localStorage.setItem(GENERATED_TICKETS_KEY, JSON.stringify(generatedTickets));
+            }
+
+            // 5. Gerar o QR Code
+            dom.qrCanvas.innerHTML = ''; // Limpa o anterior
+            const qr = qrcode(0, 'L');
+            qr.addData(payloadString);
+            qr.make();
+            dom.qrCanvas.innerHTML = qr.createImgTag(6, 8); 
+            
+            // 6. Preparar para download
+            const qrImage = dom.qrCanvas.querySelector('img');
+            dom.downloadLink.href = qrImage.src;
+            dom.downloadLink.download = `ingresso_${name.replace(/\s+/g, '_')}.png`;
+
+            // 7. Exibir a saída
+            dom.qrCodeOutput.classList.remove('hidden');
+        };
+
+        // --- NOVO: Lógica de Exportação ---
+        dom.exportarListaButton.onclick = () => {
+            const generatedTickets = localStorage.getItem(GENERATED_TICKETS_KEY);
+            if (!generatedTickets || generatedTickets === '[]') {
+                showModal('erro', 'Erro', '', '', 'Nenhum ingresso foi gerado ainda para exportar.');
+                return;
+            }
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(generatedTickets);
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href",     dataStr);
+            downloadAnchorNode.setAttribute("download", "ingressos_vendidos.json");
+            document.body.appendChild(downloadAnchorNode); // required for firefox
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+            
+            showModal('valido', 'Sucesso', '', '', 'Lista exportada como "ingressos_vendidos.json". Envie este arquivo para a portaria.');
+        };
+
+
+        // --- Lógica do Validador de Ingresso ---
+
+        // --- NOVO: Lógica de Importação ---
+        dom.importFileInput.onchange = (event) => {
+            const file = event.target.files[0];
+            if (!file) {
+                return;
+            }
+            if (file.type !== "application/json") {
+                showModal('erro', 'Erro', '', '', 'Arquivo inválido. Por favor, selecione o arquivo .json correto.');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const content = e.target.result;
+                    const tickets = JSON.parse(content);
+                    if (!Array.isArray(tickets)) {
+                        throw new Error("Formato JSON não é um array.");
+                    }
+                    // Salva a lista mestra no localStorage do validador
+                    localStorage.setItem(SOLD_TICKETS_KEY, JSON.stringify(tickets));
+                    
+                    // ATUALIZADO: Limpa o status de auto-load e define o status de importação
+                    dom.autoLoadStatus.textContent = ''; 
+                    dom.importStatus.textContent = `Sucesso! ${tickets.length} ingressos importados.`;
+                    
+                    showModal('valido', 'Sucesso', '', '', `${tickets.length} ingressos carregados na lista mestra.`);
+                } catch (err) {
+                    dom.autoLoadStatus.textContent = '';
+                    dom.importStatus.textContent = "Erro ao ler o arquivo.";
+                    showModal('erro', 'Erro', '', '', 'Não foi possível ler o arquivo JSON. Ele pode estar corrompido.');
+                }
+            };
+            reader.readAsText(file);
+        };
+
+        // --- Lógica de Validação de QR Code (Atualizada) ---
+        async function validateQRCode(text) {
+            const secret = dom.secretKey.value;
+
+            // Verificação 0: A lista mestra foi carregada?
+            const soldTickets = JSON.parse(localStorage.getItem(SOLD_TICKETS_KEY)) || [];
+            if (soldTickets.length === 0) {
+                 showModal('erro', 'Erro', '', '', 'Nenhuma lista de ingressos carregada. Importe o .json ou gere ingressos neste dispositivo.');
+                 return;
+            }
+
+            let payload;
+            try {
+                payload = JSON.parse(text);
+            } catch (e) {
+                showModal('invalido', 'INVÁLIDO', '', '', 'Este QR Code não é um ingresso válido (Formato JSON inválido).');
+                return;
+            }
+
+            if (!payload.data || !payload.sig || !payload.data.name || !payload.data.type || !payload.data.cpf) {
+                showModal('invalido', 'INVÁLIDO', '', '', 'Este QR Code não contém os dados esperados de um ingresso (Nome, Tipo, CPF).');
+                return;
+            }
+
+            // Teste 1: Verificar a assinatura criptográfica
+            const dataString = JSON.stringify(payload.data);
+            const isSignatureValid = await verifyData(dataString, payload.sig, secret);
+
+            if (!isSignatureValid) {
+                showModal('invalido', 'INVÁLIDO', payload.data.name, payload.data.type, 'Assinatura não confere. INGRESSO FALSO.', payload.data.cpf);
+                return;
+            }
+            
+            // Teste 2: Verificar se o ingresso (pela assinatura/ID) está na lista de vendidos
+            const ticketId = payload.sig;
+            const ticketInSoldList = soldTickets.find(ticket => ticket.sig === ticketId);
+
+            if (!ticketInSoldList) {
+                showModal('invalido', 'INVÁLIDO', payload.data.name, payload.data.type, 'Ingresso autêntico, mas NÃO ESTÁ NA LISTA OFICIAL de vendidos.', payload.data.cpf);
+                return;
+            }
+
+            // Teste 3: Verificar se já foi usado (na lista de usados local)
+            let usedTickets = JSON.parse(localStorage.getItem(USED_TICKETS_KEY)) || [];
+            const existingUsedTicket = usedTickets.find(ticket => ticket.sig === ticketId);
+
+            if (existingUsedTicket) {
+                showModal('usado', 'JÁ VALIDADO', payload.data.name, payload.data.type, 'Este ingresso já foi validado anteriormente neste dispositivo.', payload.data.cpf);
+                return;
+            }
+
+            // Teste 4: SUCESSO! Ingresso válido e não utilizado.
+            // Adiciona o ingresso (objeto completo) à lista de usados
+            usedTickets.push({
+                sig: ticketId,
+                name: payload.data.name,
+                type: payload.data.type,
+                cpf: payload.data.cpf,
+                ts: payload.data.ts
+            });
+            localStorage.setItem(USED_TICKETS_KEY, JSON.stringify(usedTickets));
+            
+            showModal('valido', 'VÁLIDO', payload.data.name, payload.data.type, 'Entrada liberada. Confirme os dados com o comprador.', payload.data.cpf);
+        }
+
+        // --- Lógica da Câmera (Sem alterações) ---
+        function startScan() {
+             const soldTickets = JSON.parse(localStorage.getItem(SOLD_TICKETS_KEY)) || [];
+             if (soldTickets.length === 0) {
+                showModal('erro', 'Erro', '', '', 'Nenhuma lista de ingressos carregada. Importe o .json ou gere ingressos neste dispositivo.');
+                return;
+            }
+            
+            if (!html5QrCode) {
+                html5QrCode = new Html5Qrcode("qr-reader");
+            }
+
+            dom.scanButton.classList.add('hidden');
+            dom.stopScanButton.classList.remove('hidden');
+            dom.qrReader.style.display = 'block';
+
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            
+            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure)
+                .catch(err => {
+                    console.log("Falha ao iniciar com câmera traseira. Tentando câmera frontal.", err);
+                    html5QrCode.start({ facingMode: "user" }, config, onScanSuccess, onScanFailure)
+                        .catch(err2 => {
+                            showModal('erro', 'Erro de Câmera', '', '', 'Não foi possível acessar a câmera do dispositivo.');
+                            stopScan(); 
+                        });
+                });
+        }
+        function stopScan() {
+            if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop()
+                    .then(ignore => { console.log("Leitor parado."); })
+                    .catch(err => { console.error("Falha ao parar o leitor.", err); });
+            }
+            dom.scanButton.classList.remove('hidden');
+            dom.stopScanButton.classList.add('hidden');
+            dom.qrReader.style.display = 'none';
+        }
+        dom.scanButton.onclick = startScan;
+        dom.stopScanButton.onclick = stopScan;
+
+        function onScanSuccess(decodedText, decodedResult) {
+            console.log(`Scan result: ${decodedText}`, decodedResult);
+            stopScan();
+            validateQRCode(decodedText);
+        }
+
+        function onScanFailure(error) {
+            // A biblioteca chama isso frequentemente, mesmo sem ser um erro.
+            // console.warn(`Scan failure: ${error}`);
+        }
+
+        // --- Lógica para Consultar CPF (Atualizada) ---
+        function checkCPFStatus() {
+            const cpfToFind = dom.checkCPF.value.trim();
+            if (cpfToFind.length !== 11) {
+                showModal('erro', 'Erro', '', '', 'Por favor, insira um CPF válido de 11 dígitos para consultar.');
+                return;
+            }
+
+            // Verificação 1: O CPF está na lista de ingressos vendidos (comprou)?
+            const soldTickets = JSON.parse(localStorage.getItem(SOLD_TICKETS_KEY)) || [];
+            if (soldTickets.length === 0) {
+                 showModal('erro', 'Erro', '', '', 'Nenhuma lista de ingressos carregada. Importe o .json ou gere ingressos neste dispositivo.');
+                 return;
+            }
+            
+            const soldTicket = soldTickets.find(ticket => ticket.cpf === cpfToFind);
+
+            if (!soldTicket) {
+                // CPF não foi encontrado na lista mestra
+                showModal(
+                    'invalido', // Ícone de "inválido"
+                    'NÃO COMPROU',
+                    '',
+                    '',
+                    `Este CPF não foi encontrado na lista oficial de ingressos vendidos.`,
+                    cpfToFind 
+                );
+                return;
+            }
+            
+            // Verificação 2: O CPF está na lista de ingressos USADOS (já validou)?
+            const usedTickets = JSON.parse(localStorage.getItem(USED_TICKETS_KEY)) || [];
+            const usedTicket = usedTickets.find(ticket => ticket.cpf === cpfToFind);
+
+            if (usedTicket) {
+                // CPF comprou E JÁ USOU
+                showModal(
+                    'usado', // Ícone de "usado"
+                    'JÁ VALIDADO',
+                    usedTicket.name,
+                    usedTicket.type,
+                    `Este CPF comprou um ingresso e ele JÁ FOI VALIDADO neste dispositivo.`,
+                    usedTicket.cpf
+                );
+            } else {
+                // CPF comprou e AINDA NÃO USOU
+                showModal(
+                    'valido', // Ícone de "válido"
+                    'COMPROU (NÃO VALIDADO)',
+                    soldTicket.name,
+                    soldTicket.type,
+                    `Este CPF comprou um ingresso e ainda NÃO FOI VALIDADO.`,
+                    soldTicket.cpf
+                );
+            }
+        }
+        dom.checkCPFButton.onclick = checkCPFStatus;
+
+
+        // Limpar storage local (Apenas a lista de USADOS)
+        dom.clearUsedTickets.onclick = () => {
+            showModal(
+                'confirm', 
+                'Confirmar Ação', 
+                '', 
+                '', 
+                'Isso limpará APENAS a lista de ingressos JÁ USADOS. A lista mestra importada será mantida. Confirma?',
+                null, // Passando null para o cpf
+                () => { // Passando a função de callback
+                    localStorage.removeItem(USED_TICKETS_KEY);
+                    showModal('valido', 'Sucesso', '', '', 'A lista de ingressos usados foi limpa.');
+                }
+            );
+        };
+        
+        // --- Lógica do Modal de Resultado (Atualizada) ---
+        const icons = {
+            valido: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
+            invalido: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
+            usado: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>`,
+            erro: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`,
+            confirm: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.79 4 4s-1.79 4-4 4-4-1.79-4-4c0-1.191.52-2.261 1.343-3.032m5.203-3.13C17.398 3.32 18.9 4.5 18.9 6c0 .46-.06.909-.174 1.326m-5.412 9.074c-1.303.41-2.67.6-4.064.6-4.97 0-9-3.358-9-7.5s4.03-7.5 9-7.5c2.145 0 4.1.603 5.613 1.62m-.32 8.658A8.446 8.446 0 0115 13.5c.892 0 1.74.164 2.533.454m-1.2 4.97A8.48 8.48 0 0115 19.5c-2.145 0-4.1-.603-5.613-1.62m.32-8.658C8.3 7.234 6.705 6 4.908 6c-.46 0-.909.06-1.326.174m5.412-1.1A8.446 8.446 0 019 4.5c-.892 0-1.74.164-2.533.454m1.2-4.97C9.098 1.62 10.7 3 12.5 3c1.79 0 3.295 1.234 3.772 2.968"></path></svg>`
+        };
+        const modalColors = {
+            valido: { bg: 'bg-green-900', text: 'text-green-300', iconBg: 'bg-green-600' },
+            invalido: { bg: 'bg-red-900', text: 'text-red-300', iconBg: 'bg-red-600' },
+            usado: { bg: 'bg-yellow-900', text: 'text-yellow-300', iconBg: 'bg-yellow-600' },
+            erro: { bg: 'bg-red-900', text: 'text-red-300', iconBg: 'bg-red-600' },
+            confirm: { bg: 'bg-blue-900', text: 'text-blue-300', iconBg: 'bg-blue-600' }
+        };
+        
+        // Função showModal atualizada para lidar com o callback de confirmação
+        function showModal(tipo, status, name, type, message, cpf = null, onConfirm = null) {
+            const colors = modalColors[tipo];
+            Object.values(modalColors).forEach(c => {
+                dom.modalContent.classList.remove(c.bg, c.text);
+                dom.modalIcon.classList.remove(c.iconBg);
+            });
+            dom.modalContent.classList.add(colors.bg, colors.text);
+            dom.modalIcon.classList.add(colors.iconBg);
+            dom.modalIcon.innerHTML = icons[tipo];
+            dom.modalStatus.textContent = status;
+            dom.modalName.textContent = name;
+            dom.modalType.textContent = type;
+            
+            if (cpf) {
+                const maskedCPF = cpf.length === 11 ? 
+                    `CPF: ***.***.${cpf.substring(6, 9)}-**` : 
+                    "CPF: (Formato inválido)";
+                dom.modalCPF.textContent = maskedCPF;
+                dom.modalCPF.classList.remove('hidden');
+            } else {
+                dom.modalCPF.textContent = '';
+                dom.modalCPF.classList.add('hidden');
+            }
+
+            dom.modalMessage.textContent = message;
+
+            if (tipo === 'confirm' && typeof onConfirm === 'function') {
+                dom.closeModalButton.textContent = 'Confirmar';
+                // Remove e recria o botão para evitar múltiplos listeners
+                const newButton = dom.closeModalButton.cloneNode(true);
+                newButton.textContent = 'Confirmar'; 
+                dom.closeModalButton.parentNode.replaceChild(newButton, dom.closeModalButton);
+                dom.closeModalButton = newButton; 
+                
+                newButton.onclick = () => {
+                    onConfirm();
+                    dom.resultModal.close();
+                    resetModalButton(); // Reseta o botão para "Fechar"
+                };
+            } else {
+                resetModalButton(); // Configura o botão padrão "Fechar"
+            }
+
+            if (!dom.resultModal.open) {
+                dom.resultModal.showModal();
+            }
+        }
+        
+        // Reseta o botão modal para o comportamento padrão "Fechar"
+        function resetModalButton() {
+            dom.closeModalButton.textContent = 'Fechar';
+            const newButton = dom.closeModalButton.cloneNode(true);
+            newButton.textContent = 'Fechar'; 
+            dom.closeModalButton.parentNode.replaceChild(newButton, dom.closeModalButton);
+            dom.closeModalButton = newButton; 
+            
+            newButton.onclick = () => dom.resultModal.close();
+        }
+        
+        // Handler inicial (será substituído pelo resetModalButton se necessário)
+        dom.closeModalButton.onclick = () => dom.resultModal.close();
+        
+        // --- Inicialização ---
+        showGenerator(); // Começa na aba do gerador
+
+    </script>
+
+</body>
+</html>
+
