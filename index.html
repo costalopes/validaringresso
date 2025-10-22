@@ -240,6 +240,7 @@
         const GENERATED_TICKETS_KEY = 'validador_ingressos_gerados';
         const SOLD_TICKETS_KEY = 'validador_ingressos_vendidos'; // Lista mestra importada
         const USED_TICKETS_KEY = 'validador_ingressos_usados'; // Lista de ingressos já validados
+        const IMPORTED_FLAG_KEY = 'validador_lista_importada'; // NOVO: Flag para lista importada
 
         // --- Funções Criptográficas (HMAC-SHA256) ---
         // (Estas funções permanecem inalteradas)
@@ -303,23 +304,26 @@
             // --- NOVO: Lógica de Carregamento Automático ---
             // Limpa o status de importação, mas não o de autoload
             dom.importStatus.textContent = ''; 
-            const importedList = localStorage.getItem(SOLD_TICKETS_KEY);
+            const isImported = localStorage.getItem(IMPORTED_FLAG_KEY) === 'true';
             
-            // Se NÃO houver lista importada, tenta carregar a lista gerada localmente.
-            if (!importedList || importedList === '[]') {
+            // Se NENHUMA lista foi IMPORTADA manualmente, sincroniza com a lista gerada localmente.
+            if (!isImported) {
                 const generatedList = localStorage.getItem(GENERATED_TICKETS_KEY);
                 if (generatedList && generatedList !== '[]') {
                     // Se encontrou uma lista gerada localmente, usa ela como a "lista mestra"
+                    // Isso SEMPRE sobrescreve a lista mestra com a lista gerada mais recente
                     localStorage.setItem(SOLD_TICKETS_KEY, generatedList);
                     const tickets = JSON.parse(generatedList);
-                    const msg = `Carregados ${tickets.length} ingressos (gerados neste dispositivo).`;
+                    const msg = `Carregados ${tickets.length} ingressos (sincronizados localmente).`;
                     dom.autoLoadStatus.textContent = msg;
                     console.log(msg); // Log para debug
                 } else {
                     dom.autoLoadStatus.textContent = "Nenhuma lista local encontrada. Importe um arquivo.";
                 }
             } else {
-                 const tickets = JSON.parse(importedList);
+                 // Se uma lista foi importada, apenas exibe o status dela
+                 const importedList = localStorage.getItem(SOLD_TICKETS_KEY);
+                 const tickets = JSON.parse(importedList || '[]');
                  dom.autoLoadStatus.textContent = `Carregados ${tickets.length} ingressos (da lista importada).`;
             }
             // --- Fim da Lógica de Carregamento Automático ---
@@ -449,6 +453,8 @@
                     }
                     // Salva a lista mestra no localStorage do validador
                     localStorage.setItem(SOLD_TICKETS_KEY, JSON.stringify(tickets));
+                    // NOVO: Define a flag de que uma lista foi importada manualmente
+                    localStorage.setItem(IMPORTED_FLAG_KEY, 'true'); 
                     
                     // ATUALIZADO: Limpa o status de auto-load e define o status de importação
                     dom.autoLoadStatus.textContent = ''; 
@@ -651,7 +657,10 @@
                 null, // Passando null para o cpf
                 () => { // Passando a função de callback
                     localStorage.removeItem(USED_TICKETS_KEY);
-                    showModal('valido', 'Sucesso', '', '', 'A lista de ingressos usados foi limpa.');
+                    // NOVO: Limpa também a flag de importação, para reativar o auto-load
+                    localStorage.removeItem(IMPORTED_FLAG_KEY);
+                    localStorage.removeItem(SOLD_TICKETS_KEY);
+                    showModal('valido', 'Sucesso', '', '', 'A lista de ingressos usados e a lista mestra foram limpas. O auto-load foi reativado.');
                 }
             );
         };
@@ -742,4 +751,5 @@
 
 </body>
 </html>
+
 
